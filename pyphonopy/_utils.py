@@ -52,3 +52,20 @@ def get_vasp_factor()->float:
     Angstrom = 1.0e-10   # [m]
     vasp_to_THZ = float(np.sqrt(EV/AMU)/Angstrom/(2*np.pi)/1e12)  # [THz] 15.633302
     return vasp_to_THZ
+
+
+def calculate_phonon_spectrum(dynamical_matrix_block:dict, reciprocal_k:np.ndarray)->np.ndarray:
+    '''
+    dynamical_matrix_block(dict): see pyphonopy.generate_dynamical_matrix_block()
+
+    reciprocal_k(np,float,(N0,3))
+
+    (ret)(np,float,(N0,N1)): frequency
+    '''
+    frequency = []
+    for k_i in reciprocal_k:
+        tmp0 = sum(np.exp(2j*np.pi*np.dot(k_i,np.array(k)))*v for k,v in dynamical_matrix_block.items())
+        frequency.append(np.linalg.eigvalsh(tmp0))
+    frequency = np.stack(frequency)
+    frequency = np.sort(np.sqrt(np.abs(frequency)) * np.sign(frequency), axis=1)
+    return frequency
