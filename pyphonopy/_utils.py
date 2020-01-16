@@ -39,6 +39,18 @@ def make_supercell(multi1, multi2, multi3, crystal_basis, atom_position, atom_sy
         return s_index_group, s_crystal_basis, s_atom_position, s_atom_symbol
 
 
+def remove_supercell(multi1, multi2, multi3, s_crystal_basis, s_atom_position, s_atom_symbol=None):
+    hf0 = lambda x: isinstance(x,int) and x>0
+    assert hf0(multi1) and hf0(multi2) and hf0(multi3)
+    multi123 = multi1*multi2*multi3
+    p_crystal_basis = s_crystal_basis / (np.array([multi1,multi2,multi3])[:,np.newaxis])
+    p_atom_position = s_atom_position[::multi123]
+    if s_atom_symbol is None:
+        return p_crystal_basis, p_atom_position
+    else:
+        return p_crystal_basis, p_atom_position, s_atom_symbol[::multi123]
+
+
 def get_vasp_factor()->float:
     '''
     (ret)(float)

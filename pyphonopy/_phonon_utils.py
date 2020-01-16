@@ -7,7 +7,7 @@ from ._utils import make_supercell
 hfe = lambda x,y:np.max(np.abs(x-y)/(np.abs(x)+np.abs(y)+1e-3))
 
 
-def verify_supercell_symmetry(force_constant, multi1, multi2, multi3, primitive_atom_symbol=None):
+def verify_supercell_symmetry(force_constant, multi1, multi2, multi3, p_atom_symbol=None):
     '''
     force_constant(np,float,(N0,N0,3,3))
 
@@ -17,22 +17,22 @@ def verify_supercell_symmetry(force_constant, multi1, multi2, multi3, primitive_
 
     multi3(int)
 
-    primitive_atom_symbol(list,str,(N1,))
-    primitive_atom_symbol(NoneType): optional
+    p_atom_symbol(list,str,(N1,))
+    p_atom_symbol(NoneType): optional
     '''
     multi123 = multi1*multi2*multi3
     assert force_constant.ndim==4
     N0 = len(force_constant)
     assert N0%multi123==0 and force_constant.shape==(N0,N0,3,3)
     num_atom = N0 // multi123
-    if primitive_atom_symbol is None:
-        primitive_atom_symbol = [f'atom{x}-' for x in range(num_atom)]
-    assert len(primitive_atom_symbol)==num_atom
+    if p_atom_symbol is None:
+        p_atom_symbol = [f'atom{x}-' for x in range(num_atom)]
+    assert len(p_atom_symbol)==num_atom
 
     tmp0 = force_constant.transpose(0,2,1,3).reshape(N0*3,N0*3)
     assert hfe(tmp0, tmp0.T) < 1e-7, 'force_constant should be symmetrical'
     index_group = [(x,y,z) for z in range(multi3) for y in range(multi2) for x in range(multi1)]
-    s_atom_str = [f'{x}({y0},{y1},{y2})' for x in primitive_atom_symbol for y0,y1,y2 in index_group]
+    s_atom_str = [f'{x}({y0},{y1},{y2})' for x in p_atom_symbol for y0,y1,y2 in index_group]
     index_group_to_index = {y:list(range(x,N0,multi123)) for x,y in enumerate(index_group)}
     force_constant_dict = {(k0,k1):force_constant[v0][:,v1] for k0,v0 in index_group_to_index.items()
             for k1,v1 in index_group_to_index.items()}
@@ -49,12 +49,12 @@ def verify_supercell_symmetry(force_constant, multi1, multi2, multi3, primitive_
 
 
 
-def generate_dynamical_matrix_block(crystal_basis, atom_position, multi1, multi2, multi3,
-            force_constant, atom_mass, primitive_atom_symbol=None, symprec=1e-5, tag_verify=True):
+def generate_dynamical_matrix_block(p_crystal_basis, p_atom_position, multi1, multi2, multi3,
+            force_constant, p_atom_mass, p_atom_symbol=None, symprec=1e-5, tag_verify=True):
     '''
-    crystal_basis(np,float,(3,3))
+    p_crystal_basis(np,float,(3,3)): primitive cell
 
-    atom_position(np,float,(N0,3))
+    p_atom_position(np,float,(N0,3)): primitive cell
 
     multi1(int)
 
@@ -64,10 +64,10 @@ def generate_dynamical_matrix_block(crystal_basis, atom_position, multi1, multi2
 
     force_constant(np,float,(N1,N1,3,3)): N1=N0*multi1*multi2*multi3
 
-    atom_mass(list,float,(N0))
+    p_atom_mass(list,float,(N0)): primitive cell
 
-    primitive_atom_symbol(list,str,(N1,))
-    primitive_atom_symbol(NoneType): optional
+    p_atom_symbol(list,str,(N1,))
+    p_atom_symbol(NoneType): optional
 
     symprec(float): optional
 
@@ -78,10 +78,10 @@ def generate_dynamical_matrix_block(crystal_basis, atom_position, multi1, multi2
         (%value)(np,float,(N0*3,N0*3))
     '''
     multi123 = multi1*multi2*multi3
-    num_atom = len(atom_position)
+    num_atom = len(p_atom_position)
     if tag_verify: # maybe time-consuming
-        verify_supercell_symmetry(force_constant, multi1, multi2, multi3, primitive_atom_symbol) # TODO
-    s_index_group,s_crystal_basis,s_atom_position = make_supercell(multi1, multi2, multi3, crystal_basis, atom_position)
+        verify_supercell_symmetry(force_constant, multi1, multi2, multi3, p_atom_symbol) # TODO
+    s_index_group,s_crystal_basis,s_atom_position = make_supercell(multi1, multi2, multi3, p_crystal_basis, p_atom_position)
     s_atom_position_fraction = s_atom_position @ np.linalg.inv(s_crystal_basis)
     ind_primitive = np.arange(num_atom)*multi1*multi2*multi3
 
@@ -129,7 +129,7 @@ def generate_dynamical_matrix_block(crystal_basis, atom_position, multi1, multi2
 
     tmp1 = [(tuple(x0),x1,x2,x3) for x0,x1,x2,x3 in zip(svec_int,indI,indJ,scale_factor)]
     z0 = {key:[y[1:] for y in x] for key,x in itertools.groupby(sorted(tmp1, key=lambda x: x[0]), key=lambda x: x[0])}
-    tmp0 = np.repeat(np.array(atom_mass), 3, axis=0)
+    tmp0 = np.repeat(np.array(p_atom_mass), 3, axis=0)
     mass_factor = np.sqrt(tmp0[:,np.newaxis]*tmp0)
     ret = dict()
     for key,value in z0.items():
