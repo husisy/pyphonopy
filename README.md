@@ -2,7 +2,7 @@
 
 A pure python implementation package to calculate phonon spectrum from vasprun force constant.
 
-The package phonopy (see link) is quite looooong and obscure with a lot unnecessary c/c++ code.
+The package phonopy (see [link](https://github.com/atztogo/phonopy)) is quite looooong and obscure with a lot unnecessary c/c++ code.
 
 ## quickstart
 
