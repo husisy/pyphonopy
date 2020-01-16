@@ -23,8 +23,10 @@ def verify_supercell_symmetry(force_constant, multi1, multi2, multi3, p_atom_sym
     multi123 = multi1*multi2*multi3
     assert force_constant.ndim==4
     N0 = len(force_constant)
-    assert N0%multi123==0 and force_constant.shape==(N0,N0,3,3)
+    assert N0%multi123==0
     num_atom = N0 // multi123
+    assert force_constant.shape==(N0,N0,3,3) or force_constant.shape==(N0,num_atom,3,3)
+    tag_small_force_constant = force_constant.shape==(N0,num_atom,3,3)
     if p_atom_symbol is None:
         p_atom_symbol = [f'atom{x}-' for x in range(num_atom)]
     assert len(p_atom_symbol)==num_atom
@@ -79,7 +81,8 @@ def generate_dynamical_matrix_block(p_crystal_basis, p_atom_position, multi1, mu
     '''
     multi123 = multi1*multi2*multi3
     num_atom = len(p_atom_position)
-    if tag_verify: # maybe time-consuming
+    tag_force_constant_full = force_constant.shape[1]==(num_atom*multi123)
+    if tag_verify and tag_force_constant_full: # maybe time-consuming
         verify_supercell_symmetry(force_constant, multi1, multi2, multi3, p_atom_symbol) # TODO
     s_index_group,s_crystal_basis,s_atom_position = make_supercell(multi1, multi2, multi3, p_crystal_basis, p_atom_position)
     s_atom_position_fraction = s_atom_position @ np.linalg.inv(s_crystal_basis)
@@ -135,9 +138,10 @@ def generate_dynamical_matrix_block(p_crystal_basis, p_atom_position, multi1, mu
     for key,value in z0.items():
         tmp0 = [[np.zeros((3,3)) for _ in range(num_atom)] for _ in range(num_atom)]
         for indI,indJ,factor in value:
-            tmp0[indI//multi123][indJ] = tmp0[indI//multi123][indJ] + force_constant[indI,indJ*multi123]*factor
+            tmp1 = force_constant[indI,indJ*multi123] if tag_force_constant_full else force_constant[indI,indJ]
+            tmp0[indI//multi123][indJ] = tmp0[indI//multi123][indJ] + tmp1*factor
         ret[tuple(-x for x in key)] = np.block(tmp0) / mass_factor
-    # below should give the same result
+    # below should give the same result when tag_force_constant_full
     # ret = dict()
     # for key,value in z0.items():
     #     tmp0 = [[np.zeros((3,3)) for _ in range(num_atom)] for _ in range(num_atom)]
