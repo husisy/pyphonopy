@@ -131,8 +131,8 @@ tmp0 = [
     [117, "Uus", "Ununseptium", None],  # 117
     [118, "Uuo", "Ununoctium", None],  # 118
 ]
-phonopy_element_number_to_info = {x[1]:{'number':x[0], 'symbol':x[1], 'name':x[2], 'mass':x[3]} for x in tmp0}
-phonopy_element_symbol_to_info = {x[0]:{'number':x[0], 'symbol':x[1], 'name':x[2], 'mass':x[3]} for x in tmp0}
+phonopy_element_number_to_info = {x[0]:{'number':x[0], 'symbol':x[1], 'name':x[2], 'mass':x[3]} for x in tmp0}
+phonopy_element_symbol_to_info = {x[1]:{'number':x[0], 'symbol':x[1], 'name':x[2], 'mass':x[3]} for x in tmp0}
 
 
 def parse_band_conf(filepath:str):
@@ -140,15 +140,22 @@ def parse_band_conf(filepath:str):
         z0 = [x.strip() for x in fid]
     tmp0 = [x.split('=',1)[1].strip() for x in z0 if x.startswith('DIM')]
     assert len(tmp0)==1
-    mutli1,multi2,multi3 = [int(x) for x in tmp0[0].split()]
-    return mutli1,multi2,multi3
+    multi123 = tuple(int(x) for x in tmp0[0].split())
+
+    tmp0 = [x for x in z0 if x.startswith('BAND =')]
+    assert len(tmp0)==1
+    band_path = np.array([float(x) for x in tmp0[0].split('=',1)[1].strip().split()]).reshape(-1, 3)
+    tmp0 = [x for x in z0 if x.startswith('BAND_POINTS')]
+    assert len(tmp0)==1
+    num_point = int(tmp0[0].split('=',1)[1].strip())
+    reciprocal_k = np.concatenate([hf_interp(x,y,num_point) for x,y in zip(band_path[:-1], band_path[1:])])
+    return multi123,reciprocal_k
 
 
-def parse_phonopy_band_data_yaml(filepath:str, tag_plot:bool=False):
+def parse_phonopy_band_data_yaml(filepath:str, tag_plot:bool=False, with_eigenvector=False):
     assert filepath.endswith('.yaml')
     with open(filepath, encoding='utf-8') as fid:
         z0 = yaml.load(fid.read(), Loader=yaml.Loader)
-    tmp0 = np.array([[[x3 for x2 in x1['eigenvector'] for x3 in x2] for x1 in x0['band']] for x0 in z0['phonon']])
     yaml_data = {
         'symbol': [x['symbol'] for x in z0['points']],
         'coordinates': [x['coordinates'] for x in z0['points']],
@@ -158,8 +165,10 @@ def parse_phonopy_band_data_yaml(filepath:str, tag_plot:bool=False):
         'distance': np.array([x['distance'] for x in z0['phonon']]),
         'frequency': np.sort(np.array([[y['frequency'] for y in x['band']] for x in z0['phonon']]), axis=1),
         'group_velocity': np.array([[y['group_velocity'] for y in x['band']] for x in z0['phonon']]),
-        'eigenvector': tmp0[:,:,:,0] + tmp0[:,:,:,1]*1j, #(np,complex)
     }
+    if with_eigenvector:
+        tmp0 = np.array([[[x3 for x2 in x1['eigenvector'] for x3 in x2] for x1 in x0['band']] for x0 in z0['phonon']])
+        yaml_data['eigenvector'] = tmp0[:,:,:,0] + tmp0[:,:,:,1]*1j, #(np,complex)
     tmp0 = np.concatenate([[0],np.cumsum(np.array(yaml_data['segment_nqpoint']))-1])
     yaml_data['special_kpoint'] = yaml_data['distance'][tmp0]
     yaml_data['special_kpoint_str'] = [x[0] for x in z0['labels']] + [z0['labels'][-1][-1]]
@@ -251,7 +260,7 @@ def parse_POSCAR(filepath:str):
     '''
     with open(filepath, encoding='utf-8') as fid:
         z0 = [x.strip() for x in fid]
-    ind0 = [ind0 for ind0,x in enumerate(z0) if x.startswith('CONTCAR')][0] + 1
+    ind0 = [ind0 for ind0,x in enumerate(z0) if x.startswith('C')][0] + 1 #some old file format
     assert abs(float(z0[ind0])-1)<1e-7, 'absolutely NOT support scale!=1'
     crystal_basis = np.array([[float(y) for y in x.split()] for x in z0[(ind0+1):(ind0+4)]])
     tmp0 = z0[ind0+4].split()
